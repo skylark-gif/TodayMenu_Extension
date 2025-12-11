@@ -1,3 +1,30 @@
+// HTML에서 targetDateStr(예: "2025.12.08") 블록만 텍스트로 뽑기
+function extractMenuBlock(html, targetDateStr) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  const text = doc.body.innerText || "";
+
+  const idx = text.indexOf(targetDateStr);
+  if (idx === -1) {
+    return null;
+  }
+
+  const after = text.slice(idx);
+
+  // 다음 날짜(YYYY.MM.DD)가 나오기 전까지만 잘라냄
+  const nextMatch = after.slice(targetDateStr.length).match(/\d{4}\.\d{2}\.\d{2}/);
+  let block;
+  if (nextMatch) {
+    const nextIdx = after.indexOf(nextMatch[0]);
+    block = after.slice(0, nextIdx);
+  } else {
+    block = after;
+  }
+
+  return block.trim();
+}
+
 // 중복 삽입 방지
 if (!window.__gachonMenuInjected) {
   window.__gachonMenuInjected = true;
@@ -77,19 +104,29 @@ function initGachonMenuButton() {
 
       // background에 메시지 보내서 메뉴 가져오기
       chrome.runtime.sendMessage(
-        { type: "GET_MENU", place },
-        (response) => {
-          if (!response || !response.ok) {
-            content.innerHTML = `<div class="gachon-menu-status">불러오기 실패: ${
-              (response && response.error) || "알 수 없는 오류"
-            }</div>`;
-            return;
-          }
+  { type: "GET_MENU", place },
+  (response) => {
+    if (!response || !response.ok) {
+      content.innerHTML = `<div class="gachon-menu-status">불러오기 실패: ${
+        (response && response.error) || "알 수 없는 오류"
+      }</div>`;
+      return;
+    }
 
-          cache[place] = response; // 캐시 저장
-          renderMenu(content, place, response);
-        }
-      );
+    // background에서 받은 html + date로 실제 메뉴 텍스트 추출
+    const block = extractMenuBlock(response.html, response.date);
+    const text = block || "해당 날짜 식단이 없습니다.";
+
+    const data = {
+      date: response.date,
+      text
+    };
+
+    cache[place] = data;        // 캐시에는 정리된 데이터만 저장
+    renderMenu(content, place, data);
+  }
+);
+
     });
   });
 }
