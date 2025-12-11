@@ -1,37 +1,70 @@
-// HTML에서 targetDateStr(예: "2025.12.08") 블록만 텍스트로 뽑기
+// 중복 삽입 방지
+if (!window.__gachonMenuInjected) {
+  window.__gachonMenuInjected = true;
+  initGachonMenu();
+}
+
+// HTML에서 targetDateStr(예: "2025.12.08") 하루치 블록만 뽑기
 function extractMenuBlock(html, targetDateStr) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
 
   const text = doc.body.innerText || "";
+  // 줄 단위로 쪼개고 양쪽 공백 제거, 빈 줄 제거
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
 
-  const idx = text.indexOf(targetDateStr);
-  if (idx === -1) {
+  const dateLineRegex = /^\d{4}\.\d{2}\.\d{2}$/;
+
+  // 1) "식단기간 2025.12.08 ~ ..." 말고
+  //    진짜 날짜 줄: "2025.12.08" 딱 한 줄만 잡기
+  let startIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === targetDateStr && dateLineRegex.test(lines[i])) {
+      startIndex = i;
+      break;
+    }
+  }
+
+  // 혹시 못 찾으면(포맷이 약간 다를 때) 예비 플랜
+  if (startIndex === -1) {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(targetDateStr) && !lines[i].includes("식단기간")) {
+        startIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (startIndex === -1) {
     return null;
   }
 
-  const after = text.slice(idx);
+  const resultLines = [];
+  resultLines.push(lines[startIndex]); // "2025.12.08" 줄
 
-  // 다음 날짜(YYYY.MM.DD)가 나오기 전까지만 잘라냄
-  const nextMatch = after.slice(targetDateStr.length).match(/\d{4}\.\d{2}\.\d{2}/);
-  let block;
-  if (nextMatch) {
-    const nextIdx = after.indexOf(nextMatch[0]);
-    block = after.slice(0, nextIdx);
-  } else {
-    block = after;
+  // 2) 다음 날짜 줄(예: 2025.12.09)이 나오기 전까지 수집
+  for (let j = startIndex + 1; j < lines.length; j++) {
+    const line = lines[j];
+
+    // 다음 날짜의 시작이면 종료
+    if (dateLineRegex.test(line) && line !== targetDateStr) {
+      break;
+    }
+    // 혹시 다시 식단기간 블록 만나도 종료
+    if (/^식단기간\s+\d{4}\.\d{2}\.\d{2}/.test(line)) {
+      break;
+    }
+
+    resultLines.push(line);
   }
 
-  return block.trim();
+  return resultLines.join("\n").trim();
 }
 
-// 중복 삽입 방지
-if (!window.__gachonMenuInjected) {
-  window.__gachonMenuInjected = true;
-  initGachonMenuButton();
-}
-
-function initGachonMenuButton() {
+function initGachonMenu() {
   // 왼쪽 아래 버튼
   const button = document.createElement("button");
   button.id = "gachon-menu-button";
@@ -104,29 +137,28 @@ function initGachonMenuButton() {
 
       // background에 메시지 보내서 메뉴 가져오기
       chrome.runtime.sendMessage(
-  { type: "GET_MENU", place },
-  (response) => {
-    if (!response || !response.ok) {
-      content.innerHTML = `<div class="gachon-menu-status">불러오기 실패: ${
-        (response && response.error) || "알 수 없는 오류"
-      }</div>`;
-      return;
-    }
+        { type: "GET_MENU", place },
+        (response) => {
+          if (!response || !response.ok) {
+            content.innerHTML = `<div class="gachon-menu-status">불러오기 실패: ${
+              (response && response.error) || "알 수 없는 오류"
+            }</div>`;
+            return;
+          }
 
-    // background에서 받은 html + date로 실제 메뉴 텍스트 추출
-    const block = extractMenuBlock(response.html, response.date);
-    const text = block || "해당 날짜 식단이 없습니다.";
+          // background에서 받은 html + date로 실제 메뉴 텍스트 추출
+          const block = extractMenuBlock(response.html, response.date);
+          const text = block || "해당 날짜 식단이 없습니다.";
 
-    const data = {
-      date: response.date,
-      text
-    };
+          const data = {
+            date: response.date,
+            text
+          };
 
-    cache[place] = data;        // 캐시에는 정리된 데이터만 저장
-    renderMenu(content, place, data);
-  }
-);
-
+          cache[place] = data;        // 캐시에는 정리된 데이터만 저장
+          renderMenu(content, place, data);
+        }
+      );
     });
   });
 }
@@ -135,7 +167,9 @@ function renderMenu(container, place, data) {
   const placeName =
     place === "vision" ? "비전타워" : place === "grad" ? "교육대학원" : "학생생활관";
 
-  const safeText = (data.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safeText = (data.text || "")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
   container.innerHTML = `
     <div class="gachon-menu-place">${placeName} (${data.date || ""})</div>
