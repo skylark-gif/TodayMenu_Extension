@@ -1,0 +1,99 @@
+/* 왼쪽 아래 고정 버튼 */
+#gachon-menu-button {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 999999;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #2c7be5;
+  color: #ffffff;
+  font-size: 13px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+#gachon-menu-button:hover {
+  background: #1b5dc0;
+}
+
+/* 팝업 박스 */
+#gachon-menu-popup {
+  position: fixed;
+  left: 16px;
+  bottom: 60px;
+  z-index: 999999;
+  width: 280px;
+  max-height: 400px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  padding: 10px 12px;
+  box-sizing: border-box;
+  display: none;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 13px;
+}
+
+/* 팝업 헤더 */
+#gachon-menu-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+#gachon-menu-close {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* 탭 영역 */
+#gachon-menu-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.gachon-tab {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #f2f4f7;
+}
+
+.gachon-tab.active {
+  background: #2c7be5;
+  color: #ffffff;
+}
+
+/* 내용 영역 */
+#gachon-menu-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.gachon-menu-status {
+  color: #666666;
+  font-size: 12px;
+}
+
+.gachon-menu-place {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.gachon-menu-pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+}
