@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "가천대 오늘 학식",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "비전타워, 교육대학원, 학생생활관 오늘 학식 메뉴를 어디서든 바로 확인합니다.",
   "permissions": [
     "activeTab",
@@ -24,3 +24,4 @@
     }
   ]
 }
+
