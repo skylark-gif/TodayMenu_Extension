@@ -6,34 +6,17 @@ const MENU_URLS = {
 };
 
 // KST 기준 오늘 날짜를 "YYYY.MM.DD" 형식으로 반환
-// KST 기준으로 "실제로 찾을 날짜"를 반환
-// 월~금 : 오늘 날짜
-// 토요일 : 다음 주 월요일 (이틀 뒤)
-// 일요일 : 다음 날 월요일 (하루 뒤)
-function getTargetDateStringKST() {
+function getTodayStringKST() {
   const now = new Date();
+  // 현재 로컬시간 -> KST로 보정 (UTC+9)
   const utc = now.getTime() + now.getTimezoneOffset() * 60000;
   const kst = new Date(utc + 9 * 60 * 60000);
 
-  const day = kst.getDay(); // 0: 일, 1: 월, ... 6: 토
-
-  let offsetDays = 0;
-  if (day === 6) {
-    // 토요일 → +2일(월요일)
-    offsetDays = 2;
-  } else if (day === 0) {
-    // 일요일 → +1일(월요일)
-    offsetDays = 1;
-  }
-
-  const target = new Date(kst.getTime() + offsetDays * 24 * 60 * 60 * 1000);
-
-  const y = target.getFullYear();
-  const m = String(target.getMonth() + 1).padStart(2, "0");
-  const d = String(target.getDate()).padStart(2, "0");
+  const y = kst.getFullYear();
+  const m = String(kst.getMonth() + 1).padStart(2, "0");
+  const d = String(kst.getDate()).padStart(2, "0");
   return `${y}.${m}.${d}`;
 }
-
 
 // HTML에서 오늘 날짜 블록만 텍스트로 뽑기
 function extractTodayBlockFromHtml(html, todayStr) {
@@ -88,16 +71,15 @@ async function fetchMenu(placeKey) {
       return {
         ok: true,
         date: todayStr,
-       text: "오늘 날짜 식단이 없습니다."
+        text: "오늘 날짜 식단이 없습니다."
       };
     }
 
-return {
-  ok: true,
-  date: todayStr,
-  text: block
-};
-
+    return {
+      ok: true,
+      date: todayStr,
+      text: block
+    };
   } catch (e) {
     console.error(e);
     return {
