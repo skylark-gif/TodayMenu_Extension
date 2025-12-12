@@ -7,7 +7,6 @@ if (!window.__gachonMenuInjected) {
 /**
  * HTML에서 targetDateStr(예: "2025.12.08") 하루치 식단만 뽑기
  */
-// HTML에서 targetDateStr(예: "2025.12.08") 하루치 식단만 뽑기
 function extractMenuBlock(html, targetDateStr) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
@@ -26,7 +25,9 @@ function extractMenuBlock(html, targetDateStr) {
   //   → "2025.12.08  ( 월 )"처럼
   //      날짜 + ( 요일 ) 형태인 줄만 시작점으로 사용
   let startIndex = -1;
-  const dateLineRegex = new RegExp("^" + targetDateStr.replace(/\./g, "\\.") + "\\s*\\(");
+  const dateLineRegex = new RegExp(
+    "^" + targetDateStr.replace(/\./g, "\\.") + "\\s*\\("
+  );
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -91,6 +92,58 @@ function extractMenuBlock(html, targetDateStr) {
   return resultLines.join("\n").trim();
 }
 
+/**
+ * 한 날짜 블록 텍스트를
+ *  - 날짜 한 줄
+ *  - 식단구분별 section 배열
+ * 로 파싱
+ */
+function parseMenuBlock(blockText) {
+  if (!blockText) return { dateLine: "", sections: [] };
+
+  const lines = blockText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.length === 0) return { dateLine: "", sections: [] };
+
+  const dateLine = lines[0]; // 예: "2025.12.08  ( 월 )"
+  const rest = lines.slice(1);
+
+  const sections = [];
+  let current = null;
+
+  function isSectionHeader(line) {
+    // 식단 구분 헤더 특징:
+    //  - "천원의아침밥"
+    //  - "점심 A메뉴(정식) 6000원"
+    //  - "점심 B메뉴(단품) 5500원" 등
+    if (line.length > 30) return false; // 너무 길면 메뉴 내용일 확률 ↑
+    if (line.includes("아침밥")) return true;
+    if (line.includes("메뉴")) return true;
+    if (/[0-9]+원\)?$/.test(line)) return true;
+    return false;
+  }
+
+  for (const line of rest) {
+    if (isSectionHeader(line)) {
+      // 새 섹션 시작
+      if (current) sections.push(current);
+      current = { title: line, items: [] };
+    } else {
+      if (!current) {
+        // 혹시 헤더 나오기 전에 내용이 있으면 "기타"로
+        current = { title: "기타", items: [] };
+      }
+      current.items.push(line);
+    }
+  }
+
+  if (current) sections.push(current);
+
+  return { dateLine, sections };
+}
 
 function initGachonMenu() {
   // 왼쪽 아래 버튼
@@ -123,7 +176,7 @@ function initGachonMenu() {
   const content = popup.querySelector("#gachon-menu-content");
 
   let isOpen = false;
-  const cache = {}; // { vision: {date, text}, ... }
+  const cache = {}; // { vision: {date, dateLine, sections, rawText}, ... }
 
   // 버튼 클릭 → 팝업 열기/닫기
   button.addEventListener("click", () => {
@@ -178,12 +231,16 @@ function initGachonMenu() {
           const block = extractMenuBlock(response.html, response.date);
           const text = block || "해당 날짜 식단이 없습니다.";
 
+          const parsed = parseMenuBlock(text);
+
           const data = {
             date: response.date,
-            text
+            dateLine: parsed.dateLine,
+            sections: parsed.sections,
+            rawText: text
           };
 
-          cache[place] = data;        // 캐시에는 정리된 데이터만 저장
+          cache[place] = data; // 캐시 저장
           renderMenu(content, place, data);
         }
       );
@@ -195,12 +252,40 @@ function renderMenu(container, place, data) {
   const placeName =
     place === "vision" ? "비전타워" : place === "grad" ? "교육대학원" : "학생생활관";
 
-  const safeText = (data.text || "")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  function esc(s) {
+    return (s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
 
-  container.innerHTML = `
-    <div class="gachon-menu-place">${placeName} (${data.date || ""})</div>
-    <pre class="gachon-menu-pre">${safeText}</pre>
+  // 섹션 파싱이 안 됐으면 그냥 예전처럼 텍스트로 보여주기
+  if (!data.sections || data.sections.length === 0) {
+    const safeText = esc(data.rawText || "");
+    container.innerHTML = `
+      <div class="gachon-menu-place">${placeName} (${esc(data.date)})</div>
+      <pre class="gachon-menu-pre">${safeText}</pre>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="gachon-menu-place">${placeName} (${esc(data.date)})</div>
+    <div class="gachon-menu-date-line">${esc(data.dateLine || "")}</div>
   `;
+
+  for (const section of data.sections) {
+    html += `
+      <div class="gachon-menu-section">
+        <div class="gachon-menu-section-title">${esc(section.title)}</div>
+        <ul class="gachon-menu-items">
+          ${section.items
+            .map((item) => `<li>${esc(item)}</li>`)
+            .join("")}
+        </ul>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
 }
