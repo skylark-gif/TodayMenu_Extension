@@ -4,57 +4,67 @@ if (!window.__gachonMenuInjected) {
   initGachonMenu();
 }
 
-// HTML에서 targetDateStr(예: "2025.12.08") 하루치 블록만 뽑기
+/**
+ * HTML에서 targetDateStr(예: "2025.12.08") 하루치 식단만 뽑기
+ */
 function extractMenuBlock(html, targetDateStr) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
 
   const text = doc.body.innerText || "";
+
   // 줄 단위로 쪼개고 양쪽 공백 제거, 빈 줄 제거
   const lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  const dateLineRegex = /^\d{4}\.\d{2}\.\d{2}$/;
+  // 날짜 패턴 (줄 어디에 있어도 잡기 위해 전체 매칭)
+  const datePattern = /\d{4}\.\d{2}\.\d{2}/;
 
-  // 1) "식단기간 2025.12.08 ~ ..." 말고
-  //    진짜 날짜 줄: "2025.12.08" 딱 한 줄만 잡기
+  // 1) 시작 줄 찾기: "2025.12.08  ( 월 )" 같이
+  //    targetDateStr를 포함하지만, "식단기간 ..." 같은 헤더는 제외
   let startIndex = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i] === targetDateStr && dateLineRegex.test(lines[i])) {
+    const line = lines[i];
+    if (
+      line.includes(targetDateStr) &&
+      !line.includes("식단기간")
+    ) {
       startIndex = i;
       break;
     }
   }
 
-  // 혹시 못 찾으면(포맷이 약간 다를 때) 예비 플랜
   if (startIndex === -1) {
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(targetDateStr) && !lines[i].includes("식단기간")) {
-        startIndex = i;
-        break;
-      }
-    }
-  }
-
-  if (startIndex === -1) {
+    // 못 찾으면 그냥 null
     return null;
   }
 
   const resultLines = [];
-  resultLines.push(lines[startIndex]); // "2025.12.08" 줄
+  resultLines.push(lines[startIndex]); // 예: "2025.12.08  ( 월 )"
 
-  // 2) 다음 날짜 줄(예: 2025.12.09)이 나오기 전까지 수집
+  // 2) 다음 날짜 또는 푸터/스크립트 시작 전까지 수집
   for (let j = startIndex + 1; j < lines.length; j++) {
     const line = lines[j];
 
-    // 다음 날짜의 시작이면 종료
-    if (dateLineRegex.test(line) && line !== targetDateStr) {
+    // (1) 다른 날짜를 만나면 종료 (예: 2025.12.09 ...)
+    const m = line.match(datePattern);
+    if (m && m[0] !== targetDateStr) {
       break;
     }
-    // 혹시 다시 식단기간 블록 만나도 종료
-    if (/^식단기간\s+\d{4}\.\d{2}\.\d{2}/.test(line)) {
+
+    // (2) 푸터/기타 영역 만나면 종료
+    if (
+      /^대학발전기금$/.test(line) ||
+      /^개인정보처리방침$/.test(line) ||
+      /^개인정보공시$/.test(line) ||
+      line.includes("© 20") ||
+      line.startsWith("function adjustStyle") ||
+      line.startsWith("$(function()") ||
+      line.startsWith("$(document).ready(") ||
+      line.startsWith("window.dataLayer")
+    ) {
       break;
     }
 
