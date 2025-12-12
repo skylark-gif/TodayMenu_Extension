@@ -7,6 +7,7 @@ if (!window.__gachonMenuInjected) {
 /**
  * HTML에서 targetDateStr(예: "2025.12.08") 하루치 식단만 뽑기
  */
+// HTML에서 targetDateStr(예: "2025.12.08") 하루치 식단만 뽑기
 function extractMenuBlock(html, targetDateStr) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
@@ -19,30 +20,46 @@ function extractMenuBlock(html, targetDateStr) {
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  // 날짜 패턴 (줄 어디에 있어도 잡기 위해 전체 매칭)
   const datePattern = /\d{4}\.\d{2}\.\d{2}/;
 
-  // 1) 시작 줄 찾기: "2025.12.08  ( 월 )" 같이
-  //    targetDateStr를 포함하지만, "식단기간 ..." 같은 헤더는 제외
+  // 1) 시작 줄 찾기
+  //   → "2025.12.08  ( 월 )"처럼
+  //      날짜 + ( 요일 ) 형태인 줄만 시작점으로 사용
   let startIndex = -1;
+  const dateLineRegex = new RegExp("^" + targetDateStr.replace(/\./g, "\\.") + "\\s*\\(");
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (
-      line.includes(targetDateStr) &&
-      !line.includes("식단기간")
-    ) {
+
+    // 예: "2025.12.08  ( 월 )"
+    if (dateLineRegex.test(line)) {
       startIndex = i;
       break;
     }
   }
 
+  // 혹시 형식이 조금 달랐을 때 예비 플랜
   if (startIndex === -1) {
-    // 못 찾으면 그냥 null
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (
+        line.includes(targetDateStr) &&
+        line.includes("(") &&
+        !line.includes("식단기간")
+      ) {
+        startIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (startIndex === -1) {
     return null;
   }
 
   const resultLines = [];
-  resultLines.push(lines[startIndex]); // 예: "2025.12.08  ( 월 )"
+  // 여기서부터는 "2025.12.08  ( 월 )" 줄이 첫 줄
+  resultLines.push(lines[startIndex]);
 
   // 2) 다음 날짜 또는 푸터/스크립트 시작 전까지 수집
   for (let j = startIndex + 1; j < lines.length; j++) {
@@ -73,6 +90,7 @@ function extractMenuBlock(html, targetDateStr) {
 
   return resultLines.join("\n").trim();
 }
+
 
 function initGachonMenu() {
   // 왼쪽 아래 버튼
